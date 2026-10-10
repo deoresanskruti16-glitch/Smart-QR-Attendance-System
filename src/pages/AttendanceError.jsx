@@ -10,7 +10,8 @@ import {
   Navigation,
   MapPin,
   Compass,
-  Radio
+  Radio,
+  CheckCircle2
 } from 'lucide-react';
 
 const AttendanceError = () => {
@@ -151,6 +152,23 @@ const AttendanceError = () => {
 
           {/* Action Buttons */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {reason === 'OUT_OF_BOUNDS' && (
+              <button 
+                onClick={() => navigate(`/student/details?token=${encodeURIComponent(token || '')}&demo=valid`)}
+                className="btn btn-block btn-lg"
+                style={{ 
+                  background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', 
+                  color: '#FFFFFF', 
+                  fontWeight: 700,
+                  border: 'none',
+                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                }}
+              >
+                <CheckCircle2 size={18} />
+                <span>Mark Attendance in Demo Mode (Inside Class)</span>
+              </button>
+            )}
+
             <button 
               onClick={() => navigate(`/student/details?token=${encodeURIComponent(token || '')}`)}
               className="btn btn-primary btn-block btn-lg"

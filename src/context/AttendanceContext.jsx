@@ -183,6 +183,10 @@ export const AttendanceProvider = ({ children }) => {
       ...sessionData,
       classroomId: targetRoom.id,
       classroomName: targetRoom.name,
+      latitude: targetRoom.latitude,
+      longitude: targetRoom.longitude,
+      radiusMeters: targetRoom.radiusMeters,
+      maxAccuracyAllowed: targetRoom.maxAccuracyAllowed,
       createdAt: new Date().toISOString(),
       expiresAt,
       isActive: true,
@@ -200,6 +204,9 @@ export const AttendanceProvider = ({ children }) => {
         division: newSession.division,
         classroomId: newSession.classroomId,
         classroomName: newSession.classroomName,
+        latitude: newSession.latitude,
+        longitude: newSession.longitude,
+        radiusMeters: newSession.radiusMeters,
         time: newSession.startTime,
         date: newSession.date,
         status: 'Active',
@@ -224,14 +231,35 @@ export const AttendanceProvider = ({ children }) => {
   };
 
   // Student marks attendance with Backend Location Verification
-  const markAttendance = ({ prn, name, domain, division, token, location }) => {
+  const markAttendance = ({ prn, name, domain, division, token, location, sessionMeta }) => {
     const trimmedPRN = (prn || '').trim();
     const trimmedName = (name || '').trim();
 
-    // 1. Resolve Target Session from Token
-    const targetSession = (activeSession && activeSession.token === token)
+    // 1. Resolve Target Session from Token or sessionMeta (for cross-device QR scanning)
+    let targetSession = (activeSession && activeSession.token === token)
       ? activeSession 
-      : sessions.find(s => s.token === token) || activeSession;
+      : sessions.find(s => s.token === token);
+
+    if (!targetSession && sessionMeta) {
+      targetSession = {
+        id: `SES-${Date.now().toString().slice(-4)}`,
+        token: token,
+        subject: sessionMeta.subject || 'Lecture Session',
+        className: sessionMeta.className || 'S.Y',
+        division: sessionMeta.division || division || 'DS-A',
+        classroomId: sessionMeta.classroomId || 'CR-204',
+        classroomName: sessionMeta.classroomName || 'Room 204 - Data Science Lab',
+        latitude: sessionMeta.lat !== undefined ? Number(sessionMeta.lat) : 21.3115,
+        longitude: sessionMeta.lon !== undefined ? Number(sessionMeta.lon) : 74.8812,
+        radiusMeters: sessionMeta.radius !== undefined ? Number(sessionMeta.radius) : 20,
+        date: new Date().toISOString().split('T')[0],
+        expiresAt: sessionMeta.expiresAt || new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        isActive: true,
+        totalStudents: 4
+      };
+    } else if (!targetSession) {
+      targetSession = activeSession;
+    }
 
     if (!targetSession) {
       return { 
@@ -243,7 +271,7 @@ export const AttendanceProvider = ({ children }) => {
 
     // 2. Check if Session Expired or Inactive
     const isExpired = new Date(targetSession.expiresAt) < new Date() || targetSession.isActive === false;
-    if (isExpired && targetSession.token === activeSession?.token) {
+    if (isExpired && targetSession.token === activeSession?.token && targetSession.isActive === false) {
       return { 
         success: false, 
         reason: 'EXPIRED', 
@@ -265,9 +293,24 @@ export const AttendanceProvider = ({ children }) => {
     }
 
     // 4. Server-Side Geofencing Verification
-    // Retrieve registered classroom coordinates from trusted database
+    // Retrieve registered classroom coordinates from trusted database or session payload
     const assignedRoomId = targetSession.classroomId || 'CR-204';
-    const trustedClassroom = getClassroomById(assignedRoomId);
+    let trustedClassroom = getClassroomById(assignedRoomId);
+    if (sessionMeta?.lat !== undefined && sessionMeta?.lon !== undefined) {
+      trustedClassroom = {
+        ...trustedClassroom,
+        latitude: Number(sessionMeta.lat),
+        longitude: Number(sessionMeta.lon),
+        radiusMeters: sessionMeta.radius !== undefined ? Number(sessionMeta.radius) : trustedClassroom.radiusMeters
+      };
+    } else if (targetSession.latitude !== undefined && targetSession.longitude !== undefined) {
+      trustedClassroom = {
+        ...trustedClassroom,
+        latitude: Number(targetSession.latitude),
+        longitude: Number(targetSession.longitude),
+        radiusMeters: targetSession.radiusMeters || trustedClassroom.radiusMeters
+      };
+    }
 
     const geofenceResult = verifyGeofence(location, trustedClassroom);
 

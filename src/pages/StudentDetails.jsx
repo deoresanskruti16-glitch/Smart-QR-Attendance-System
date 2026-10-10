@@ -27,16 +27,61 @@ const StudentDetails = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') || 'DEMO_CSF_02';
+  const demoParam = searchParams.get('demo');
+
+  // Parse session metadata if passed in URL from dynamic QR
+  const sessionMeta = {
+    token,
+    subject: searchParams.get('subject'),
+    className: searchParams.get('className'),
+    division: searchParams.get('division'),
+    classroomId: searchParams.get('classroomId'),
+    classroomName: searchParams.get('classroomName'),
+    lat: searchParams.get('lat'),
+    lon: searchParams.get('lon'),
+    radius: searchParams.get('radius'),
+    expiresAt: searchParams.get('expiresAt')
+  };
+
   const { markAttendance, activeSession, sessions, getClassroomById } = useAttendance();
 
   // Find target session
-  const targetSession = (activeSession && activeSession.token === token)
+  let targetSession = (activeSession && activeSession.token === token)
     ? activeSession
-    : sessions.find(s => s.token === token) || activeSession;
+    : sessions.find(s => s.token === token);
 
-  const targetClassroom = targetSession?.classroomId 
+  if (!targetSession && sessionMeta.subject) {
+    targetSession = {
+      id: `SES-QR`,
+      token: token,
+      subject: sessionMeta.subject,
+      className: sessionMeta.className || 'S.Y',
+      division: sessionMeta.division || 'DS-A',
+      classroomId: sessionMeta.classroomId || 'CR-204',
+      classroomName: sessionMeta.classroomName || 'Room 204 - Data Science Lab',
+      latitude: sessionMeta.lat ? Number(sessionMeta.lat) : 21.3115,
+      longitude: sessionMeta.lon ? Number(sessionMeta.lon) : 74.8812,
+      radiusMeters: sessionMeta.radius ? Number(sessionMeta.radius) : 20,
+      expiresAt: sessionMeta.expiresAt || new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      isActive: true
+    };
+  } else if (!targetSession) {
+    targetSession = activeSession;
+  }
+
+  const baseClassroom = targetSession?.classroomId 
     ? getClassroomById(targetSession.classroomId)
     : getClassroomById('CR-204');
+
+  const targetClassroom = {
+    ...baseClassroom,
+    id: sessionMeta.classroomId || baseClassroom?.id || 'CR-204',
+    name: sessionMeta.classroomName || baseClassroom?.name || 'Room 204 - Data Science Lab',
+    latitude: sessionMeta.lat ? Number(sessionMeta.lat) : (baseClassroom?.latitude ?? 21.3115),
+    longitude: sessionMeta.lon ? Number(sessionMeta.lon) : (baseClassroom?.longitude ?? 74.8812),
+    radiusMeters: sessionMeta.radius ? Number(sessionMeta.radius) : (baseClassroom?.radiusMeters ?? 20),
+    maxAccuracyAllowed: baseClassroom?.maxAccuracyAllowed ?? 50
+  };
 
   const [formData, setFormData] = useState({
     prn: '251106012',
@@ -53,7 +98,7 @@ const StudentDetails = () => {
   const [gpsStatus, setGpsStatus] = useState('LOCATING');
   const [gpsMessage, setGpsMessage] = useState('Acquiring your current GPS location...');
   const [locationData, setLocationData] = useState(null);
-  const [locationMode, setLocationMode] = useState('device'); // 'device' | 'sim_valid' | 'sim_outside' | 'sim_poor_acc'
+  const [locationMode, setLocationMode] = useState(() => demoParam === 'valid' ? 'sim_valid' : 'device'); // 'device' | 'sim_valid' | 'sim_outside' | 'sim_poor_acc'
 
   // Fetch real device GPS coordinates
   const acquireDeviceLocation = useCallback(() => {
@@ -188,7 +233,8 @@ const StudentDetails = () => {
         domain: formData.domain,
         division: formData.division,
         token: token,
-        location: locationData
+        location: locationData,
+        sessionMeta
       });
 
       setIsSubmitting(false);
@@ -337,6 +383,44 @@ const StudentDetails = () => {
                     Distance: {liveDistance}m
                   </div>
                 )}
+              </div>
+            )}
+
+            {locationMode === 'device' && liveDistance !== null && liveDistance > (targetClassroom?.radiusMeters || 20) && (
+              <div 
+                style={{
+                  marginTop: '10px',
+                  background: 'var(--warning-bg)',
+                  border: '1px solid var(--warning-border)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '10px 12px',
+                  fontSize: '12px',
+                  color: 'var(--warning-text)'
+                }}
+              >
+                <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                  <AlertTriangle size={15} color="#D97706" />
+                  <span>Outside Classroom Boundary ({liveDistance}m away)</span>
+                </div>
+                <div style={{ fontSize: '11px', lineHeight: 1.4, marginBottom: '6px' }}>
+                  Your real GPS is outside <strong>{targetClassroom.name}</strong>. If evaluating/testing outside college, click below to simulate in-class presence:
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLocationMode('sim_valid')}
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    background: '#10B981',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🟢 Switch to Inside Class (Demo Mode)
+                </button>
               </div>
             )}
 

@@ -20,13 +20,12 @@ const ScannerComponent = ({ onScanSuccess, defaultToken = '' }) => {
   const html5QrCodeRef = useRef(null);
   const readerElementId = 'html5-qr-reader-container';
 
-  // Helper to extract token from URL or raw string
+  // Helper to extract token or full search params from URL or raw string
   const parseToken = (decodedText) => {
     try {
       if (decodedText.includes('token=')) {
         const url = new URL(decodedText.startsWith('http') ? decodedText : `http://localhost/${decodedText}`);
-        const token = url.searchParams.get('token');
-        if (token) return token;
+        if (url.search) return url.search;
       }
     } catch (e) {
       console.warn('URL parsing fallback:', e);

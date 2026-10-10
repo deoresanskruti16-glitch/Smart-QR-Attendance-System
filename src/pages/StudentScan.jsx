@@ -16,16 +16,20 @@ const StudentScan = () => {
   const [searchParams] = useSearchParams();
   const urlToken = searchParams.get('token');
 
-  // If token is already in URL parameters when student navigates here, navigate straight to student details
+  // If token is already in URL parameters when student navigates here, navigate straight to student details preserving all metadata
   useEffect(() => {
     if (urlToken) {
-      navigate(`/student/details?token=${encodeURIComponent(urlToken)}`);
+      navigate(`/student/details?${searchParams.toString()}`);
     }
-  }, [urlToken, navigate]);
+  }, [urlToken, searchParams, navigate]);
 
-  const handleScanSuccess = (token) => {
-    if (token) {
-      navigate(`/student/details?token=${encodeURIComponent(token)}`);
+  const handleScanSuccess = (payload) => {
+    if (payload) {
+      if (payload.startsWith('?')) {
+        navigate(`/student/details${payload}`);
+      } else {
+        navigate(`/student/details?token=${encodeURIComponent(payload)}`);
+      }
     }
   };
 

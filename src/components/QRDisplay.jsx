@@ -25,9 +25,21 @@ const QRDisplay = ({ session, onGenerateNew, onExpire }) => {
 
   const isExpired = !session?.isActive || (session?.expiresAt && new Date(session.expiresAt) <= new Date());
   
-  // Construct scan link
+  // Construct scan link with complete session and classroom metadata
   const origin = window.location.origin;
-  const scanLink = `${origin}/student/scan?token=${encodeURIComponent(session?.token || '')}`;
+  const searchParams = new URLSearchParams();
+  if (session?.token) searchParams.set('token', session.token);
+  if (session?.subject) searchParams.set('subject', session.subject);
+  if (session?.className) searchParams.set('className', session.className);
+  if (session?.division) searchParams.set('division', session.division);
+  if (session?.classroomId) searchParams.set('classroomId', session.classroomId);
+  if (session?.classroomName) searchParams.set('classroomName', session.classroomName);
+  if (session?.latitude !== undefined) searchParams.set('lat', session.latitude.toString());
+  if (session?.longitude !== undefined) searchParams.set('lon', session.longitude.toString());
+  if (session?.radiusMeters !== undefined) searchParams.set('radius', session.radiusMeters.toString());
+  if (session?.expiresAt) searchParams.set('expiresAt', session.expiresAt);
+
+  const scanLink = `${origin}/student/scan?${searchParams.toString()}`;
 
   useEffect(() => {
     if (!session || !canvasRef.current) return;
